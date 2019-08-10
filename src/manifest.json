@@ -19,18 +19,9 @@
   "default_locale": "en",
   "permissions": [
     "<all_urls>",
-    "storage",
-    "notifications",
-    "sessions",
-    "browserSettings"
+    "storage"
   ],
   "optional_permissions": [
-    "tabs",
-    "bookmarks",
-    "clipboardWrite",
-    "clipboardRead",
-    "downloads",
-    "search"
   ],
   "content_scripts": [
     {
