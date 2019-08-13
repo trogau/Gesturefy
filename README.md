@@ -1,4 +1,4 @@
-** This is a simple hack of the original Gesturefy extension which removes the requirement for several of the WebExtension API permissions ("storage", "notifications", "sessions", "browserSettings").**
+## This is a simple hack of the original Gesturefy extension which removes the requirement for several of the WebExtension API permissions ("storage", "notifications", "sessions", "browserSettings").
 
 It was done mostly as an experiment to see how much gesturing functionality would remain with as few permissions as possible. 
 
