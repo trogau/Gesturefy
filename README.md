@@ -1,3 +1,14 @@
+** This is a simple hack of the original Gesturefy extension which removes the requirement for several of the WebExtension API permissions ("storage", "notifications", "sessions", "browserSettings").**
+
+It was done mostly as an experiment to see how much gesturing functionality would remain with as few permissions as possible. 
+
+Known broken stuff: 
+- the options page no longer works. Only some basic default gestures will work (scroll to top/bottom, next/prev page, next/prev tab, new tab, reload tab). 
+- rocker & wheel gestures were intentionally removed
+- guestures don't work on the installation splash page
+- context menus are gone
+
+
 [<img align="right" src="https://img.shields.io/amo/stars/gesturefy.svg">](https://addons.mozilla.org/firefox/addon/gesturefy/reviews/)
 [<img align="right" src="https://img.shields.io/amo/users/gesturefy.svg">](https://addons.mozilla.org/firefox/addon/gesturefy/statistics)
 [<img align="right" src="https://img.shields.io/github/release/robbendebiene/gesturefy.svg">](https://github.com/Robbendebiene/Gesturefy/releases)
