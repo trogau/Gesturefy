@@ -21,47 +21,28 @@ export default class ConfigManager {
       throw "The second argument must be an URL to a JSON file.";
     }
 
+    // trog - 2019-08-13 - massively reworked this section to hardcode some basic defaults and remove the requirement for the `storage`
+    // permission in the manifest.json. 
+    // These changes were also replicated in the content-bundle.js (this file is part of that bundle).
+    const fetchResources = [ JSON.parse('{ "Gestures": [ { "gesture": "DU", "command": "NewTab", "settings": { "position": "default", "focus": true } }, { "gesture": "RL", "command": "CloseTab", "settings": { "nextFocus": "default", "closePinned": true } }, { "gesture": "L", "command": "PageBack" }, { "gesture": "R", "command": "PageForth" }, { "gesture": "U", "command": "ScrollTop", "settings": { "duration": 100 } }, { "gesture": "D", "command": "ScrollBottom", "settings": { "duration": 100 } }, { "gesture": "DR", "command": "FocusRightTab" }, { "gesture": "DL", "command": "FocusLeftTab" } ], "Settings": { "General": { "theme": "dark", "updateNotification": false }, "Gesture": { "Timeout": { "active": true }, "Command": { "display": true, "Style": { "fontSize": "5vh" } } }, "Rocker": { "active": false }, "Wheel": { "active": false } }}') ];
+    fetchResources.push(JSON.parse('{ "Settings": { "Gesture": { "mouseButton": 2, "suppressionKey": "", "distanceThreshold": 10, "distanceSensitivity": 10, "Timeout": { "active": false, "duration": 1 }, "Trace": { "display": true, "Style": { "opacity": 0.8, "strokeStyle": "#00AAA0", "lineWidth": 10, "lineGrowth": true } }, "Directions": { "display": true, "Style": { "color": "#FFFFFF", "backgroundColor": "#000000", "backgroundOpacity": 0.3, "fontSize": "8vh", "textAlign": "center" } }, "Command": { "display": true, "Style": { "color": "#FFFFFF", "backgroundColor": "#000000", "backgroundOpacity": 0.3, "fontSize": "6vh" } } }, "Rocker": { "active": false, "leftMouseClick": { "command": "PageBack" }, "rightMouseClick": { "command": "PageForth" } }, "Wheel": { "active": false, "mouseButton": 1, "wheelSensitivity": 2, "wheelUp": { "command": "FocusRightTab" }, "wheelDown": { "command": "FocusLeftTab" } }, "General": { "updateNotification": true, "theme": "default" } }, "Gestures": [ { "gesture": "DU", "command": "NewTab", "settings": { "position": "default", "focus": true } }, { "gesture": "RL", "command": "CloseTab", "settings": { "nextFocus": "default", "closePinned": true } }, { "gesture": "LR", "command": "RestoreTab", "settings": { "currentWindowOnly": true } }, { "gesture": "LDR", "command": "ReloadTab", "settings": { "cache": false } }, { "gesture": "RDL", "command": "ReloadTab", "settings": { "cache": true } }, { "gesture": "L", "command": "PageBack" }, { "gesture": "R", "command": "PageForth" }, { "gesture": "U", "command": "ScrollTop", "settings": { "duration": 100 } }, { "gesture": "D", "command": "ScrollBottom", "settings": { "duration": 100 } }, { "gesture": "DR", "command": "FocusRightTab" }, { "gesture": "DL", "command": "FocusLeftTab" }, { "gesture": "LDRUL", "command": "OpenAddonSettings" } ], "Blacklist": []}') );
+
+    // load ressources
+    this._loaded = Promise.all(fetchResources);    
+
     this._storageArea = storageArea;
     // empty object as default value so the config doesn't have to be loaded
     this._storage = {};
     this._defaults = {};
-
-    const fetchResources = [ browser.storage[this._storageArea].get() ];
-    if (typeof defaultsURL === "string") {
-      const defaultsObject = new Promise((resolve, reject) => {
-        fetch(defaultsURL, {mode:'same-origin'})
-          .then(res => res.json())
-          .then(obj => resolve(obj), err => reject(err));
-       });
-      fetchResources.push( defaultsObject );
-    }
-    // load ressources
-    this._loaded = Promise.all(fetchResources);
-    // store ressources when loaded
-    this._loaded.then((values) => {
-      if (values[0]) this._storage = values[0];
-      if (values[1]) this._defaults = values[1];
-    });
-
+    
     // holds all custom event callbacks
     this._events = {
       'change': new Set()
     };
-    // defines if the storage should be automatically loaded und updated on storage changes
-    this._autoUpdate = false;
-    // setup on storage change handler
-    browser.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === this._storageArea) {
-        // automatically update config if defined
-        if (this._autoUpdate === true) {
-          for (let property in changes) {
-            this._storage[property] = changes[property].newValue;
-          }
-        }
-        // execute event callbacks
-        this._events["change"].forEach((callback) => callback(changes));
-      }
-    });
+
+    // trog
+    this._storage = JSON.parse('{ "Gestures": [ { "gesture": "DU", "command": "NewTab", "settings": { "position": "default", "focus": true } }, { "gesture": "RL", "command": "CloseTab", "settings": { "nextFocus": "default", "closePinned": true } }, { "gesture": "L", "command": "PageBack" }, { "gesture": "R", "command": "PageForth" }, { "gesture": "U", "command": "ScrollTop", "settings": { "duration": 100 } }, { "gesture": "D", "command": "ScrollBottom", "settings": { "duration": 100 } }, { "gesture": "DR", "command": "FocusRightTab" }, { "gesture": "DL", "command": "FocusLeftTab" } ], "Settings": { "General": { "theme": "dark", "updateNotification": false }, "Gesture": { "Timeout": { "active": true }, "Command": { "display": true, "Style": { "fontSize": "5vh" } } }, "Rocker": { "active": false }, "Wheel": { "active": false } }}');
+    this._default = JSON.parse('{ "Settings": { "Gesture": { "mouseButton": 2, "suppressionKey": "", "distanceThreshold": 10, "distanceSensitivity": 10, "Timeout": { "active": false, "duration": 1 }, "Trace": { "display": true, "Style": { "opacity": 0.8, "strokeStyle": "#00AAA0", "lineWidth": 10, "lineGrowth": true } }, "Directions": { "display": true, "Style": { "color": "#FFFFFF", "backgroundColor": "#000000", "backgroundOpacity": 0.3, "fontSize": "8vh", "textAlign": "center" } }, "Command": { "display": true, "Style": { "color": "#FFFFFF", "backgroundColor": "#000000", "backgroundOpacity": 0.3, "fontSize": "6vh" } } }, "Rocker": { "active": false, "leftMouseClick": { "command": "PageBack" }, "rightMouseClick": { "command": "PageForth" } }, "Wheel": { "active": false, "mouseButton": 1, "wheelSensitivity": 2, "wheelUp": { "command": "FocusRightTab" }, "wheelDown": { "command": "FocusLeftTab" } }, "General": { "updateNotification": true, "theme": "default" } }, "Gestures": [ { "gesture": "DU", "command": "NewTab", "settings": { "position": "default", "focus": true } }, { "gesture": "RL", "command": "CloseTab", "settings": { "nextFocus": "default", "closePinned": true } }, { "gesture": "LR", "command": "RestoreTab", "settings": { "currentWindowOnly": true } }, { "gesture": "LDR", "command": "ReloadTab", "settings": { "cache": false } }, { "gesture": "RDL", "command": "ReloadTab", "settings": { "cache": true } }, { "gesture": "L", "command": "PageBack" }, { "gesture": "R", "command": "PageForth" }, { "gesture": "U", "command": "ScrollTop", "settings": { "duration": 100 } }, { "gesture": "D", "command": "ScrollBottom", "settings": { "duration": 100 } }, { "gesture": "DR", "command": "FocusRightTab" }, { "gesture": "DL", "command": "FocusLeftTab" }, { "gesture": "LDRUL", "command": "OpenAddonSettings" } ], "Blacklist": []}');
   }
 
 
@@ -82,16 +63,25 @@ export default class ConfigManager {
    * If the storage path does not exist in the config or the function is called before the config has been loaded it will return undefined
    **/
   get (storagePath = []) {
-    if (typeof storagePath === "string") storagePath = storagePath.split('.');
+    if (typeof storagePath === "string") 
+    {
+      //console.log("storagePath: " + storagePath);
+      storagePath = storagePath.split('.');
+    }
     else if (!Array.isArray(storagePath)) {
       throw "The first argument must be a storage path either in the form of an array or a string concatenated with dots.";
     }
 
     const pathWalker = (obj, key) => isObject(obj) ? obj[key] : undefined;
+
     let entry = storagePath.reduce(pathWalker, this._storage);
     // try to get the default value
     if (entry === undefined) entry = storagePath.reduce(pathWalker, this._defaults);
-    if (entry !== undefined) return cloneObject(entry);
+    if (entry !== undefined)
+    {
+      //console.log(JSON.stringify(entry));
+      return cloneObject(entry);
+    } 
 
     return undefined;
   }
