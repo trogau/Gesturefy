@@ -221,47 +221,31 @@ class ConfigManager {
       throw "The second argument must be an URL to a JSON file.";
     }
 
+    // trog - 2019-08-13 - massively reworked this section to hardcode some basic defaults and remove the requirement for the `storage`
+    // permission in the manifest.json. 
+
     this._storageArea = storageArea;
     // empty object as default value so the config doesn't have to be loaded
     this._storage = {};
     this._defaults = {};
 
-    const fetchResources = [ browser.storage[this._storageArea].get() ];
-    if (typeof defaultsURL === "string") {
-      const defaultsObject = new Promise((resolve, reject) => {
-        fetch(defaultsURL, {mode:'same-origin'})
-          .then(res => res.json())
-          .then(obj => resolve(obj), err => reject(err));
-       });
-      fetchResources.push( defaultsObject );
-    }
+    const fetchResources = [ JSON.parse('{ "Gestures": [ { "gesture": "DU", "command": "NewTab", "settings": { "position": "default", "focus": true } }, { "gesture": "RL", "command": "CloseTab", "settings": { "nextFocus": "default", "closePinned": true } }, { "gesture": "L", "command": "PageBack" }, { "gesture": "R", "command": "PageForth" }, { "gesture": "U", "command": "ScrollTop", "settings": { "duration": 100 } }, { "gesture": "D", "command": "ScrollBottom", "settings": { "duration": 100 } }, { "gesture": "DR", "command": "FocusRightTab" }, { "gesture": "DL", "command": "FocusLeftTab" } ], "Settings": { "General": { "theme": "dark", "updateNotification": false }, "Gesture": { "Timeout": { "active": true }, "Command": { "display": true, "Style": { "fontSize": "5vh" } } }, "Rocker": { "active": false }, "Wheel": { "active": false } }}') ];
+    fetchResources.push(JSON.parse('{ "Settings": { "Gesture": { "mouseButton": 2, "suppressionKey": "", "distanceThreshold": 10, "distanceSensitivity": 10, "Timeout": { "active": false, "duration": 1 }, "Trace": { "display": true, "Style": { "opacity": 0.8, "strokeStyle": "#00AAA0", "lineWidth": 10, "lineGrowth": true } }, "Directions": { "display": true, "Style": { "color": "#FFFFFF", "backgroundColor": "#000000", "backgroundOpacity": 0.3, "fontSize": "8vh", "textAlign": "center" } }, "Command": { "display": true, "Style": { "color": "#FFFFFF", "backgroundColor": "#000000", "backgroundOpacity": 0.3, "fontSize": "6vh" } } }, "Rocker": { "active": false, "leftMouseClick": { "command": "PageBack" }, "rightMouseClick": { "command": "PageForth" } }, "Wheel": { "active": false, "mouseButton": 1, "wheelSensitivity": 2, "wheelUp": { "command": "FocusRightTab" }, "wheelDown": { "command": "FocusLeftTab" } }, "General": { "updateNotification": true, "theme": "default" } }, "Gestures": [ { "gesture": "DU", "command": "NewTab", "settings": { "position": "default", "focus": true } }, { "gesture": "RL", "command": "CloseTab", "settings": { "nextFocus": "default", "closePinned": true } }, { "gesture": "LR", "command": "RestoreTab", "settings": { "currentWindowOnly": true } }, { "gesture": "LDR", "command": "ReloadTab", "settings": { "cache": false } }, { "gesture": "RDL", "command": "ReloadTab", "settings": { "cache": true } }, { "gesture": "L", "command": "PageBack" }, { "gesture": "R", "command": "PageForth" }, { "gesture": "U", "command": "ScrollTop", "settings": { "duration": 100 } }, { "gesture": "D", "command": "ScrollBottom", "settings": { "duration": 100 } }, { "gesture": "DR", "command": "FocusRightTab" }, { "gesture": "DL", "command": "FocusLeftTab" }, { "gesture": "LDRUL", "command": "OpenAddonSettings" } ], "Blacklist": []}') );
+
     // load ressources
     this._loaded = Promise.all(fetchResources);
+
     // store ressources when loaded
     this._loaded.then((values) => {
       if (values[0]) this._storage = values[0];
       if (values[1]) this._defaults = values[1];
     });
-
+   
     // holds all custom event callbacks
+    // trog - CORE - this is required for guesturing to work
     this._events = {
       'change': new Set()
     };
-    // defines if the storage should be automatically loaded und updated on storage changes
-    this._autoUpdate = false;
-    // setup on storage change handler
-    browser.storage.onChanged.addListener((changes, areaName) => {
-      if (areaName === this._storageArea) {
-        // automatically update config if defined
-        if (this._autoUpdate === true) {
-          for (let property in changes) {
-            this._storage[property] = changes[property].newValue;
-          }
-        }
-        // execute event callbacks
-        this._events["change"].forEach((callback) => callback(changes));
-      }
-    });
   }
 
 
@@ -1052,358 +1036,9 @@ function handleDragstart$1 (event) {
   }
 }
 
-// global static variables
+// trog removed wheel-gesture-controller code
 
-const LEFT_MOUSE_BUTTON$2 = 1;
-const RIGHT_MOUSE_BUTTON$1 = 2;
-
-/**
- * RockerGestureController "singleton"
- * provides 2 events: on rockerleft and rockerright
- * events can be added via addEventListener and removed via removeEventListener
- * on default the controller is disabled and must be enabled via enable()
- **/
-
-
-// public methods and variables
-
-
-var RockerGestureController = {
-  enable: enable$2,
-  disable: disable$2,
-  addEventListener: addEventListener$1,
-  hasEventListener: hasEventListener$1,
-  removeEventListener: removeEventListener$1,
-
-  get targetElement () {
-    return targetElement$1;
-  },
-  set targetElement (value) {
-    targetElement$1 = value;
-  }
-};
-
-
-/**
- * Add callbacks to the given events
- **/
-function addEventListener$1 (event, callback) {
-  // if event exists add listener (duplicates won't be added)
-  if (event in events$1) events$1[event].add(callback);
-}
-
-/**
- * Check if an event listener is registered
- **/
-function hasEventListener$1 (event, callback) {
-  // if event exists check for listener
-  if (event in events$1) events$1[event].has(callback);
-}
-
-/**
- * Remove callbacks from the given events
- **/
-function removeEventListener$1 (event, callback) {
-  // if event exists remove listener
-  if (event in events$1) events$1[event].delete(callback);
-}
-
-/**
- * Add the event listeners to detect a gesture start
- **/
-function enable$2 () {
-  targetElement$1.addEventListener('mousedown', handleMousedown$1, true);
-  targetElement$1.addEventListener('mouseup', handleMouseup$1, true);
-  targetElement$1.addEventListener('click', handleClick, true);
-  targetElement$1.addEventListener('contextmenu', handleContextmenu$1, true);
-  targetElement$1.addEventListener('visibilitychange', handleVisibilitychange, true);
-}
-
-/**
- * Remove the event listeners and resets the controller
- **/
-function disable$2 () {
-  preventDefault = true;
-  targetElement$1.removeEventListener('mousedown', handleMousedown$1, true);
-  targetElement$1.removeEventListener('mouseup', handleMouseup$1, true);
-  targetElement$1.removeEventListener('click', handleClick, true);
-  targetElement$1.removeEventListener('contextmenu', handleContextmenu$1, true);
-  targetElement$1.removeEventListener('visibilitychange', handleVisibilitychange, true);
-}
-
-// private variables and methods
-
-// holds all custom module event callbacks
-const events$1 = {
-  'rockerleft': new Set(),
-  'rockerright': new Set()
-};
-
-let targetElement$1 = window;
-
-// defines whether or not the click/contextmenu should be prevented
-// keep preventDefault true for the special case that the contextmenu or click is fired without a privious mousedown
-let preventDefault = true;
-
-// timestamp of the last mouseup
-// this is needed to distinguish between true mouse click events and other click events fired by pressing enter or by clicking labels
-let lastMouseup = 0;
-
-
-/**
- * Handles mousedown which will detect the target and handle prevention
- **/
-function handleMousedown$1 (event) {
-  if (event.isTrusted) {
-    // always disable prevention on mousedown
-    preventDefault = false;
-
-    if (event.buttons === LEFT_MOUSE_BUTTON$2 + RIGHT_MOUSE_BUTTON$1 && (event.button === toSingleButton(LEFT_MOUSE_BUTTON$2) || event.button === toSingleButton(RIGHT_MOUSE_BUTTON$1))) {
-      // dispatch all binded functions on rocker and pass the appropriate event
-      if (event.button === toSingleButton(LEFT_MOUSE_BUTTON$2)) events$1['rockerleft'].forEach((callback) => callback(event));
-      else if (event.button === toSingleButton(RIGHT_MOUSE_BUTTON$1)) events$1['rockerright'].forEach((callback) => callback(event));
-
-      event.stopPropagation();
-      event.preventDefault();
-      // enable prevention
-      preventDefault = true;
-    }
-  }
-}
-
-
-/**
- * This is only needed to distinguish between true mouse click events and other click events fired by pressing enter or by clicking labels
- * Other property values like screen position or target could be used in the same manner
- **/
-function handleMouseup$1(event) {
-  lastMouseup = event.timeStamp;
-}
-
-
-/**
- * This is only needed for tab changing actions
- * Because the rocker gesture is executed in a different tab as where click/contextmenu needs to be prevented
- **/
-function handleVisibilitychange() {
-  // keep preventDefault true for the special case that the contextmenu or click is fired without a privious mousedown
-  preventDefault = true;
-}
-
-
-/**
- * Handles and prevents context menu if needed (right click)
- **/
-function handleContextmenu$1 (event) {
-  if (event.isTrusted && preventDefault && event.button === toSingleButton(RIGHT_MOUSE_BUTTON$1)) {
-    // prevent contextmenu
-    event.stopPropagation();
-    event.preventDefault();
-  }
-}
-
-
-/**
- * Handles and prevents click event if needed (left click)
- **/
-function handleClick (event) {
-  // event.detail because a click event can be fired without clicking (https://stackoverflow.com/questions/4763638/enter-triggers-button-click)
-  // timeStamp check ensures that the click is fired by mouseup
-  if (event.isTrusted && preventDefault && event.button === toSingleButton(LEFT_MOUSE_BUTTON$2) && event.detail && event.timeStamp === lastMouseup) {
-    // prevent click
-    event.stopPropagation();
-    event.preventDefault();
-  }
-}
-
-// global static variables
-
-const LEFT_MOUSE_BUTTON$3 = 1;
-const RIGHT_MOUSE_BUTTON$2 = 2;
-const MIDDLE_MOUSE_BUTTON$2 = 4;
-
-/**
- * WheelGestureController "singleton"
- * provides 2 events: on wheelup and wheeldown
- * events can be added via addEventListener and removed via removeEventListener
- * on default the controller is disabled and must be enabled via enable()
- **/
-
-
-// public methods and variables
-
-
-var WheelGestureController = {
-  enable: enable$3,
-  disable: disable$3,
-  addEventListener: addEventListener$2,
-  hasEventListener: hasEventListener$2,
-  removeEventListener: removeEventListener$2,
-
-  get targetElement () {
-    return targetElement$2;
-  },
-  set targetElement (value) {
-    targetElement$2 = value;
-  },
-
-  get mouseButton () {
-    return mouseButton$2;
-  },
-  set mouseButton (value) {
-    mouseButton$2 = Number(value);
-  },
-
-  get wheelSensitivity () {
-    return wheelSensitivity;
-  },
-  set wheelSensitivity (value) {
-    wheelSensitivity = Number(value);
-  }
-};
-
-
-/**
- * Add callbacks to the given events
- **/
-function addEventListener$2 (event, callback) {
-  // if event exists add listener (duplicates won't be added)
-  if (event in events$2) events$2[event].add(callback);
-}
-
-/**
- * Check if an event listener is registered
- **/
-function hasEventListener$2 (event, callback) {
-  // if event exists check for listener
-  if (event in events$2) events$2[event].has(callback);
-}
-
-/**
- * Remove callbacks from the given events
- **/
-function removeEventListener$2 (event, callback) {
-  // if event exists remove listener
-  if (event in events$2) events$2[event].delete(callback);
-}
-
-/**
- * Add the document event listener
- **/
-function enable$3 () {
-  targetElement$2.addEventListener('wheel', handleWheel, true);
-  targetElement$2.addEventListener('mousedown', handleMousedown$2, true);
-  targetElement$2.addEventListener('mouseup', handleMouseup$2, true);
-  targetElement$2.addEventListener('click', handleClick$1, true);
-  targetElement$2.addEventListener('contextmenu', handleContextmenu$2, true);
-  targetElement$2.addEventListener('visibilitychange', handleVisibilitychange$1, true);
-}
-
-/**
- * Remove the event listeners and resets the handler
- **/
-function disable$3 () {
-  preventDefault$1 = true;
-  targetElement$2.removeEventListener('wheel', handleWheel, true);
-  targetElement$2.removeEventListener('mousedown', handleMousedown$2, true);
-  targetElement$2.removeEventListener('mouseup', handleMouseup$2, true);
-  targetElement$2.removeEventListener('click', handleClick$1, true);
-  targetElement$2.removeEventListener('contextmenu', handleContextmenu$2, true);
-  targetElement$2.removeEventListener('visibilitychange', handleVisibilitychange$1, true);
-}
-
-// private variables and methods
-
-// holds all custom module event callbacks
-const events$2 = {
-  'wheelup': new Set(),
-  'wheeldown': new Set()
-};
-
-let targetElement$2 = window,
-    mouseButton$2 = LEFT_MOUSE_BUTTON$3,
-    wheelSensitivity = 2;
-
-// keep preventDefault true for the special case that the contextmenu or click is fired without a privious mousedown
-let preventDefault$1 = true;
-
-let lastMouseup$1 = 0;
-
-
-/**
- * Handles mousedown which will detect the target and handle prevention
- **/
-function handleMousedown$2 (event) {
-  if (event.isTrusted && event.buttons === mouseButton$2) {
-    // always disable prevention on mousedown
-    preventDefault$1 = false;
-
-    // prevent middle click scroll
-    if (mouseButton$2 === MIDDLE_MOUSE_BUTTON$2) event.preventDefault();
-  }
-}
-
-
-/**
- * Handles mousewheel up and down and prevents scrolling if needed
- **/
-function handleWheel (event) {
-  if (event.isTrusted && event.buttons === mouseButton$2 && event.deltaY !== 0) {
-    // dispatch all binded functions on wheel and pass the appropriate event
-    if (event.deltaY <= -wheelSensitivity) events$2['wheelup'].forEach((callback) => callback(event));
-    else if (event.deltaY >= wheelSensitivity) events$2['wheeldown'].forEach((callback) => callback(event));
-
-    event.stopPropagation();
-    event.preventDefault();
-    // enable prevention
-    preventDefault$1 = true;
-  }
-}
-
-
-/**
- * This is only needed to distinguish between true mouse click events and other click events fired by pressing enter or by clicking labels
- * Other property values like screen position or target could be used in the same manner
- **/
-function handleMouseup$2(event) {
-  lastMouseup$1 = event.timeStamp;
-}
-
-
-/**
- * This is only needed for tab changing actions
- * Because the wheel gesture is executed in a different tab as where click/contextmenu needs to be prevented
- **/
-function handleVisibilitychange$1() {
-  // keep preventDefault true for the special case that the contextmenu or click is fired without a privious mousedown
-  preventDefault$1 = true;
-}
-
-
-/**
- * Handles and prevents context menu if needed
- **/
-function handleContextmenu$2 (event) {
-  if (event.isTrusted && preventDefault$1 && event.button === toSingleButton(mouseButton$2) && mouseButton$2 === RIGHT_MOUSE_BUTTON$2) {
-    // prevent contextmenu
-    event.stopPropagation();
-    event.preventDefault();
-  }
-}
-
-
-/**
- * Handles and prevents click event if needed
- **/
-function handleClick$1 (event) {
-  // event.detail because a click event can be fired without clicking (https://stackoverflow.com/questions/4763638/enter-triggers-button-click)
-  // timeStamp check ensures that the click is fired by mouseup
-  if (event.isTrusted && preventDefault$1 && event.button === toSingleButton(mouseButton$2) && (mouseButton$2 === LEFT_MOUSE_BUTTON$3 || mouseButton$2 === MIDDLE_MOUSE_BUTTON$2) && event.detail && event.timeStamp === lastMouseup$1) {
-    // prevent left and middle click
-    event.stopPropagation();
-    event.preventDefault();
-  }
-}
+// trog removed rocker-gesture-controller code
 
 /**
  * ZoomController "singleton"
@@ -2189,10 +1824,13 @@ MouseGestureController.addEventListener("end", (events, directions) => {
 // define wheel and rocker gesture controller event listeners
 // combine them to one function, since they all do the same except the subject they send to the background script
 
+/* 
+trog removing test
 WheelGestureController.addEventListener("wheelup", event => handleRockerAndWheelEvents("wheelUp", event));
 WheelGestureController.addEventListener("wheeldown", event => handleRockerAndWheelEvents("wheelDown", event));
 RockerGestureController.addEventListener("rockerleft", event => handleRockerAndWheelEvents("rockerLeft", event));
 RockerGestureController.addEventListener("rockerright", event => handleRockerAndWheelEvents("rockerRight", event));
+*/
 
 function handleRockerAndWheelEvents (subject, event) {
   // cancel mouse gesture and terminate overlay in case it got triggered
@@ -2237,8 +1875,8 @@ function main () {
     IframeMouseGestureController.mouseButton = Config.get("Settings.Gesture.mouseButton");
     IframeMouseGestureController.suppressionKey = Config.get("Settings.Gesture.suppressionKey");
 
-    WheelGestureController.mouseButton = Config.get("Settings.Wheel.mouseButton");
-    WheelGestureController.wheelSensitivity = Config.get("Settings.Wheel.wheelSensitivity");
+    //WheelGestureController.mouseButton = Config.get("Settings.Wheel.mouseButton");
+    //WheelGestureController.wheelSensitivity = Config.get("Settings.Wheel.wheelSensitivity");
 
     MouseGestureInterface.gestureTraceLineColor = Config.get("Settings.Gesture.Trace.Style.strokeStyle");
     MouseGestureInterface.gestureTraceLineWidth = Config.get("Settings.Gesture.Trace.Style.lineWidth");
@@ -2258,28 +1896,35 @@ function main () {
     if (!isIframe()) MouseGestureController.enable();
     else IframeMouseGestureController.enable();
 
+    // trog
     // enable/disable rocker gesture
+    /*
     if (Config.get("Settings.Rocker.active")) {
-      RockerGestureController.enable();
+      //RockerGestureController.enable();
+      console.log('not implemented');
     }
     else {
-      RockerGestureController.disable();
+      //RockerGestureController.disable();
+      console.log('not implemented');
     }
 
     // enable/disable wheel gesture
     if (Config.get("Settings.Wheel.active")) {
-      WheelGestureController.enable();
+      //WheelGestureController.enable();
+      console.log('not implemented');
     }
     else {
-      WheelGestureController.disable();
+      //WheelGestureController.disable();
+      console.log('not implemented');
     }
+    */
   }
   // if url is blacklisted disable everything
   else {
     MouseGestureController.disable();
     IframeMouseGestureController.disable();
-    RockerGestureController.disable();
-    WheelGestureController.disable();
+    //RockerGestureController.disable(); // trog
+    //WheelGestureController.disable(); // trog
   }
 }
 
